@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>Monopoly Player</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #1e3c72, #2a5298);
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .card {
+      background: white;
+      color: black;
+      width: 90%;
+      max-width: 400px;
+      border-radius: 20px;
+      padding: 25px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+    }
+
+    .user {
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    .balance {
+      margin-top: 30px;
+      font-size: 32px;
+      font-weight: bold;
+    }
+
+    .transfer-btn {
+      margin-top: 40px;
+      width: 100%;
+      padding: 15px;
+      font-size: 18px;
+      border: none;
+      border-radius: 12px;
+      background: #2a5298;
+      color: white;
+      cursor: pointer;
+    }
+
+    .transfer-btn:hover {
+      background: #1e3c72;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="card">
+  <div class="user" id="userNumber"></div>
+  <div class="balance" id="balance">$15000</div>
+
+  <hr>
+
+  <select id="receiver">
+    <option value="">Select Receiver</option>
+    <option value="1">User 1</option>
+    <option value="2">User 2</option>
+    <option value="3">User 3</option>
+    <option value="4">User 4</option>
+    <option value="5">User 5</option>
+    <option value="6">User 6</option>
+    <option value="7">User 7</option>
+    <option value="8">User 8</option>
+  </select>
+
+  <input type="number" id="amount" placeholder="Amount" min="1">
+
+  <button class="transfer-btn" onclick="transfer()">
+    Transfer Money
+  </button>
+</div>
+
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, doc, getDoc, setDoc, runTransaction, onSnapshot } 
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  // 🔥 替换成你的 Firebase config
+  const firebaseConfig = {
+    apiKey: "AIzaSyCOuwE9ADs8tFmDBjhXnhYeNJ8pefPiQtc",
+    authDomain: "tcy108-1158d.firebaseapp.com",
+    projectId: "tcy108-1158d",
+    storageBucket: "tcy108-1158d.firebasestorage.app",
+    messagingSenderId: "826889675114",
+    appId: "1:826889675114:web:dc6ebf2798fda71b180513",
+    measurementId: "G-TM9DWWHR88"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // 获取 URL 参数
+  const params = new URLSearchParams(window.location.search);
+
+  // 获取玩家ID
+  let id = params.get("id") || "1";
+
+  // 转成数字
+  id = parseInt(id);
+
+  // 检查合法范围
+  if (isNaN(id) || id < 1 || id > 8) {
+    alert("Invalid Player ID! Defaulting to Player 1.");
+    id = 1;
+  }
+
+  // 转回字符串
+  id = id.toString();
+
+  // 设置页面显示玩家ID
+  document.getElementById("userNumber").innerText = "User " + id;
+
+  // Firestore 玩家引用
+  const playerRef = doc(db, "players", id);
+
+
+
+  document.getElementById("userNumber").innerText = "User " + id;
+
+  // 初始化玩家
+  async function init() {
+    const snap = await getDoc(playerRef);
+    if (!snap.exists()) {
+      await setDoc(playerRef, { balance: 15000 });
+    }
+
+    // 监听实时余额更新
+    onSnapshot(playerRef, (docSnap) => {
+      const data = docSnap.data();
+      document.getElementById("balance").innerText = "$" + data.balance;
+    });
+  }
+
+  init();
+
+  // 转账功能，使用 Firestore transaction
+  async function transferMoney(senderRef, receiverRef, amount) {
+    try {
+      await runTransaction(db, async (transaction) => {
+        const senderSnap = await transaction.get(senderRef);
+        const receiverSnap = await transaction.get(receiverRef);
+
+        if (!receiverSnap.exists()) throw "Receiver not found";
+        if (senderSnap.data().balance < amount) throw "Not enough money";
+
+        transaction.update(senderRef, { balance: senderSnap.data().balance - amount });
+        transaction.update(receiverRef, { balance: receiverSnap.data().balance + amount });
+      });
+      alert("Transfer Complete!");
+    } catch (e) {
+      alert(e);
+    }
+  }
+
+  window.transfer = async function() {
+    const receiverId = document.getElementById("receiver").value;
+
+    const amount = parseInt(document.getElementById("amount").value);
+
+    if (!receiverId || !amount) {
+      alert("Please fill all fields");
+      return;
+    }
+
+    if (receiverId === id) {
+      alert("Cannot transfer to yourself");
+      return;
+    }
+
+
+    if (receiverId < 1 || receiverId > 8) {
+      alert("Receiver ID must be 1-8");
+      return;
+    }
+
+    const receiverRef = doc(db, "players", receiverId);
+
+    await transferMoney(playerRef, receiverRef, amount);
+
+    // 清空输入框
+    document.getElementById("receiver").value = "";
+    document.getElementById("amount").value = "";
+  };
+</script>
+
+</body>
+</html>

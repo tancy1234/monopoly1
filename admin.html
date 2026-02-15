@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>Monopoly Admin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #1e3c72, #2a5298);
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding-top: 40px;
+      min-height: 100vh;
+    }
+
+    .card {
+      background: white;
+      color: black;
+      width: 90%;
+      max-width: 600px;
+      border-radius: 20px;
+      padding: 25px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      text-align: center;
+      color: white;
+      margin-bottom: 30px;
+    }
+
+    .player-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      padding: 10px;
+      background: #f2f2f2;
+      border-radius: 12px;
+    }
+
+    .player-row input {
+      width: 100px;
+      padding: 5px;
+      font-size: 16px;
+    }
+
+    .update-btn {
+      padding: 6px 12px;
+      background: #2a5298;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .update-btn:hover {
+      background: #1e3c72;
+    }
+
+    .balance {
+      font-weight: bold;
+      font-size: 18px;
+    }
+
+    .black{
+        color: black;
+    }
+
+  </style>
+</head>
+<body>
+
+<div>
+  <h1>🎛 Monopoly Admin Panel</h1>
+
+  <div id="playersContainer"></div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot } 
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  // 🔥 替换成你的 Firebase config
+  const firebaseConfig = {
+    apiKey: "AIzaSyCOuwE9ADs8tFmDBjhXnhYeNJ8pefPiQtc",
+    authDomain: "tcy108-1158d.firebaseapp.com",
+    projectId: "tcy108-1158d",
+    storageBucket: "tcy108-1158d.firebasestorage.app",
+    messagingSenderId: "826889675114",
+    appId: "1:826889675114:web:dc6ebf2798fda71b180513",
+    measurementId: "G-TM9DWWHR88"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  const playersContainer = document.getElementById("playersContainer");
+
+  // 初始化 8 个玩家
+  for (let i = 1; i <= 8; i++) {
+    const playerRef = doc(db, "players", i.toString());
+
+    // 创建 UI 元素
+    const row = document.createElement("div");
+    row.classList.add("player-row");
+    row.innerHTML = `
+      <div class="black">User ${i}</div>
+      <div class="black balance" id="balance-${i}">$0</div>
+      <input type="number" id="input-${i}" placeholder="New amount" min="0">
+      <button class="update-btn" id="btn-${i}">Update</button>
+    `;
+    playersContainer.appendChild(row);
+
+    // 初始化余额，如果不存在
+    (async () => {
+      const snap = await getDoc(playerRef);
+      if (!snap.exists()) {
+        await setDoc(playerRef, { balance: 15000 });
+      }
+    })();
+
+    // 监听实时余额
+    onSnapshot(playerRef, (docSnap) => {
+      const data = docSnap.data();
+      document.getElementById(`balance-${i}`).innerText = "$" + data.balance;
+    });
+
+    // 点击更新按钮
+    document.getElementById(`btn-${i}`).addEventListener("click", async () => {
+      const newAmount = parseInt(document.getElementById(`input-${i}`).value);
+      if (isNaN(newAmount) || newAmount < 0) {
+        alert("請輸入有效金額");
+        return;
+      }
+      await updateDoc(playerRef, { balance: newAmount });
+      document.getElementById(`input-${i}`).value = "";
+    });
+  }
+</script>
+
+</body>
+</html>
