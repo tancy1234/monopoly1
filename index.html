@@ -60,6 +60,22 @@
       margin-top: 10px;
       font-size: 16px;
     }
+
+    #penaltyBtn {
+      margin-top: 10px;
+      width: 100%;
+      padding: 15px;
+      font-size: 18px;
+      border: none;
+      border-radius: 12px;
+      background: #e74c3c;
+      color: white;
+      cursor: pointer;
+    }
+
+    #penaltyBtn:hover {
+      background: #c0392b;
+    }
   </style>
 </head>
 
@@ -88,6 +104,9 @@
   <button class="transfer-btn" onclick="transfer()">
     Transfer Money
   </button>
+
+  <input type="number" id="penaltyAmount" placeholder="Enter penalty amount" />
+  <button id="penaltyBtn">Penalty</button>
 </div>
 
 
@@ -202,6 +221,47 @@
     document.getElementById("receiver").value = "";
     document.getElementById("amount").value = "";
   };
+
+  
+
+  document.getElementById("penaltyBtn").addEventListener("click", async () => {
+
+    const amount = parseInt(document.getElementById("penaltyAmount").value);
+
+    if (isNaN(amount) || amount <= 0) {
+      alert("Enter valid penalty amount");
+      return;
+    }
+
+    try {
+      await runTransaction(db, async (transaction) => {
+
+        const snap = await transaction.get(playerRef);
+
+        if (!snap.exists()) {
+          throw "Player not found";
+        }
+
+        const currentBalance = snap.data().balance;
+
+        if (currentBalance < amount) {
+          throw "Insufficient balance";
+        }
+
+        transaction.update(playerRef, {
+          balance: currentBalance - amount
+        });
+
+      });
+
+      alert("Penalty deducted successfully!");
+      document.getElementById("penaltyAmount").value = "";
+
+    } catch (error) {
+      alert("Error: " + error);
+    }
+
+  });
 </script>
 
 </body>
