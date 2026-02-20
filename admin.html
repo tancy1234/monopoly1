@@ -84,10 +84,9 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot } 
+  import { getFirestore, doc, getDoc, setDoc, onSnapshot, runTransaction, collection, addDoc, serverTimestamp } 
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-  // 🔥 替换成你的 Firebase config
   const firebaseConfig = {
     apiKey: "AIzaSyCOuwE9ADs8tFmDBjhXnhYeNJ8pefPiQtc",
     authDomain: "tcy108-1158d.firebaseapp.com",
@@ -103,22 +102,25 @@
 
   const playersContainer = document.getElementById("playersContainer");
 
-  // 初始化 8 个玩家
   for (let i = 1; i <= 8; i++) {
+
     const playerRef = doc(db, "players", i.toString());
 
-    // 创建 UI 元素
     const row = document.createElement("div");
     row.classList.add("player-row");
     row.innerHTML = `
       <div class="black">User ${i}</div>
       <div class="black balance" id="balance-${i}">$0</div>
-      <input type="number" id="input-${i}" placeholder="New amount" min="0">
-      <button class="update-btn" id="btn-${i}">Update</button>
+      <input type="number" id="input-${i}" placeholder="Amount" min="1">
+
+      <button class="update-btn" id="add-${i}" style="background:green;">Add</button>
+      <button class="update-btn" id="deduct-${i}" style="background:orange;">Deduct</button>
+      <button class="update-btn" id="penalty-${i}" style="background:red;">Penalty</button>
     `;
+
     playersContainer.appendChild(row);
 
-    // 初始化余额，如果不存在
+    // Initialize player if not exist
     (async () => {
       const snap = await getDoc(playerRef);
       if (!snap.exists()) {
@@ -126,23 +128,75 @@
       }
     })();
 
-    // 监听实时余额
+    // Real-time listener
     onSnapshot(playerRef, (docSnap) => {
       const data = docSnap.data();
       document.getElementById(`balance-${i}`).innerText = "$" + data.balance;
     });
 
-    // 点击更新按钮
-    document.getElementById(`btn-${i}`).addEventListener("click", async () => {
-      const newAmount = parseInt(document.getElementById(`input-${i}`).value);
-      if (isNaN(newAmount) || newAmount < 0) {
-        alert("請輸入有效金額");
-        return;
-      }
-      await updateDoc(playerRef, { balance: newAmount });
-      document.getElementById(`input-${i}`).value = "";
+    // Add money
+    document.getElementById(`add-${i}`).addEventListener("click", () => {
+      handleTransaction(i, "add");
+    });
+
+    // Deduct money
+    document.getElementById(`deduct-${i}`).addEventListener("click", () => {
+      handleTransaction(i, "deduct");
+    });
+
+    // Penalty
+    document.getElementById(`penalty-${i}`).addEventListener("click", () => {
+      handleTransaction(i, "penalty");
     });
   }
+
+  async function handleTransaction(playerId, type) {
+
+    const amountInput = document.getElementById(`input-${playerId}`);
+    const amount = parseInt(amountInput.value);
+
+    if (isNaN(amount) || amount <= 0) {
+      alert("請輸入有效金額");
+      return;
+    }
+
+    const playerRef = doc(db, "players", playerId.toString());
+
+    try {
+      await runTransaction(db, async (transaction) => {
+
+        const snap = await transaction.get(playerRef);
+        const currentBalance = snap.data().balance;
+
+        let newBalance;
+
+        if (type === "add") {
+          newBalance = currentBalance + amount;
+        } else {
+          if (currentBalance < amount) {
+            throw "餘額不足";
+          }
+          newBalance = currentBalance - amount;
+        }
+
+        transaction.update(playerRef, { balance: newBalance });
+
+        // Save history
+        await addDoc(collection(db, "transactions"), {
+          playerId: playerId,
+          type: type,
+          amount: amount,
+          timestamp: serverTimestamp()
+        });
+      });
+
+      amountInput.value = "";
+
+    } catch (error) {
+      alert(error);
+    }
+  }
+
 </script>
 
 </body>
